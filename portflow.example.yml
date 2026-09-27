@@ -1,0 +1,22 @@
+# Copy this to your repo root as portflow.yml and run `portflow up`.
+version: 1
+project: shop
+
+services:
+  app:
+    domain: app.shop.test
+    port: 3000
+
+  api:
+    domain: api.shop.test
+    port: 8000
+
+  admin:
+    domain: admin.shop.test
+    port: 5173
+
+  # docs:
+  #   domain: docs.shop.test
+  #   port: 6006
+  #   no_tls: true      # optional; default is HTTPS
+  #   host: 127.0.0.1   # optional; default is loopback
