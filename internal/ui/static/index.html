@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PortFlow · dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <h1>PortFlow</h1>
+    <div id="status" class="status">…</div>
+  </header>
+  <main>
+    <section class="add">
+      <h2>Register a service</h2>
+      <form id="add-form">
+        <input name="hostname" placeholder="app.shop.test" required>
+        <input name="port" type="number" min="1" max="65535" placeholder="3000" required>
+        <input name="project" placeholder="project (optional)">
+        <label><input type="checkbox" name="tls" checked> HTTPS</label>
+        <button type="submit">Add</button>
+      </form>
+      <div id="add-err" class="err"></div>
+    </section>
+    <section class="services">
+      <h2>Services</h2>
+      <div id="services"></div>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
