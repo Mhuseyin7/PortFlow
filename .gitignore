@@ -1,0 +1,25 @@
+# Built binaries
+/portflow
+/portflow.exe
+/portflow-*
+/dist/
+
+# Test artifacts
+*.test
+coverage.out
+coverage.html
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Tauri build output
+desktop/target/
+desktop/src-tauri/target/
+desktop/node_modules/
+desktop/dist/
+
+# OS
+.DS_Store
+Thumbs.db
