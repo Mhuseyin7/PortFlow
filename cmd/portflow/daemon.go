@@ -34,6 +34,11 @@ func newDaemonStartCmd() *cobra.Command {
 		Use:   "start",
 		Short: "Start the PortFlow daemon (foreground with -f)",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Pre-flight: if another daemon is already answering /health on
+			// the API address, refuse to start instead of racing on ports.
+			if (&client{base: "http://" + apiAddr}).alive() {
+				return fmt.Errorf("a PortFlow daemon is already running on %s — stop it first with: portflow daemon stop", apiAddr)
+			}
 			dir, err := config.DataDir(cfgFile)
 			if err != nil {
 				return err
