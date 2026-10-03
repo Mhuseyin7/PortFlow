@@ -103,18 +103,19 @@ artık **trusted**.
 ## CLI Reference
 
 ```
-portflow add <domain> <port>       yeni bir service register et
-portflow remove <domain>           service'i kaldır
-portflow list                      bütün service'leri listele (project bazlı)
-portflow status                    daemon durumu
-portflow detect [--register]       loopback üzerindeki dev server'ları tara
-portflow open <domain>             domain'i browser'da aç
-portflow project init              starter portflow.yml oluştur
-portflow up [-f portflow.yml]      project file'daki her şeyi register et
-portflow trust                     local CA'yı OS trust store'a install et
-portflow untrust                   local CA'yı trust store'dan kaldır
-portflow doctor                    install ve environment tanısı
-portflow daemon start|stop         daemon lifecycle
+portflow add <domain> <port>              yeni bir service register et
+portflow remove <domain>                  service'i kaldır
+portflow list                             bütün service'leri listele (project bazlı)
+portflow info <domain>                    tek bir service için detay + canlı TCP probe
+portflow status                           daemon durumu
+portflow detect [--docker] [--register]   loopback dev server'ları (ve opsiyonel container'lar) tara
+portflow open <domain>                    domain'i browser'da aç
+portflow project init                     starter portflow.yml oluştur
+portflow up [-f portflow.yml]             project file'daki her şeyi register et
+portflow trust                            local CA'yı OS trust store'a install et
+portflow untrust                          local CA'yı trust store'dan kaldır
+portflow doctor                           install ve environment tanısı (CA expiry warning dahil)
+portflow daemon start|stop                daemon lifecycle
 ```
 
 ---
@@ -258,12 +259,25 @@ Contribution guide: [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 ---
 
+## System Service Olarak Kurma
+
+Her boot'ta otomatik başlasın isterseniz, `contrib/` altında hazır
+örnekler var:
+
+- **Linux (systemd):** [`contrib/systemd/`](contrib/systemd/) — user
+  service + `CAP_NET_BIND_SERVICE` + sandboxing
+- **macOS (launchd):** [`contrib/launchd/`](contrib/launchd/) — system
+  daemon plist
+- **Windows (NSSM):** [`contrib/windows/`](contrib/windows/) —
+  PowerShell installer
+
+---
+
 ## Status
 
 **v0.1.0 — early spike.** Core path (registry → proxy → TLS → hosts)
-çalışıyor. System service installer'lar (systemd / launchd / Windows
-Service) ve TCP alias support v0.2 için planlı. Bug report ve feedback
-çok değerli.
+çalışıyor; sistem service örnekleri `contrib/` altında hazır. TCP alias
+support v0.2 için planlı. Bug report ve feedback çok değerli.
 
 Changelog: [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
