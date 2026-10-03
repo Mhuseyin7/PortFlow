@@ -41,6 +41,7 @@ public internet and never modifies your OS trust store without an explicit comma
 		newAddCmd(),
 		newRemoveCmd(),
 		newListCmd(),
+		newInfoCmd(),
 		newStatusCmd(),
 		newDetectCmd(),
 		newOpenCmd(),
