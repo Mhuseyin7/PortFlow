@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>dev.portflow.daemon</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/portflow</string>
+        <string>daemon</string>
+        <string>start</string>
+        <string>--http</string>
+        <string>127.0.0.1:80</string>
+        <string>--https</string>
+        <string>127.0.0.1:443</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/portflow.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/portflow.err.log</string>
+</dict>
+</plist>
