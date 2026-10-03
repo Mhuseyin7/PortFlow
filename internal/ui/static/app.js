@@ -27,12 +27,16 @@ function urlFor(svc) {
   return `${scheme}://${svc.hostname}`;
 }
 
+let projectFilter = "";
+try { projectFilter = localStorage.getItem("portflow:filter") || ""; } catch {}
+
 async function refreshServices() {
   const el = $("#services");
   el.innerHTML = "";
   const list = await api("GET", "/api/services");
   if (!list || list.length === 0) {
     el.innerHTML = `<div class="muted">no services yet — add one above</div>`;
+    renderFilter([]);
     return;
   }
   const groups = {};
@@ -40,7 +44,9 @@ async function refreshServices() {
     const key = s.project || "(no project)";
     (groups[key] = groups[key] || []).push(s);
   }
+  renderFilter(Object.keys(groups));
   for (const [name, svcs] of Object.entries(groups)) {
+    if (projectFilter && projectFilter !== name) continue;
     const g = document.createElement("div");
     g.className = "group";
     g.innerHTML = `<h3>${name}</h3>`;
@@ -60,6 +66,25 @@ async function refreshServices() {
     el.appendChild(g);
   }
 }
+
+function renderFilter(projects) {
+  const el = $("#filter");
+  if (!el) return;
+  const opts = ["", ...projects].map((p) => {
+    const label = p || "all projects";
+    const sel = p === projectFilter ? " selected" : "";
+    return `<option value="${p}"${sel}>${label}</option>`;
+  }).join("");
+  el.innerHTML = opts;
+}
+
+document.addEventListener("change", (e) => {
+  if (e.target.id === "filter") {
+    projectFilter = e.target.value;
+    try { localStorage.setItem("portflow:filter", projectFilter); } catch {}
+    refreshServices();
+  }
+});
 
 document.addEventListener("click", async (e) => {
   const copy = e.target.dataset.copy;

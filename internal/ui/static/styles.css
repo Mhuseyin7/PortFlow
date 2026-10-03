@@ -43,6 +43,10 @@ section {
   border: 1px solid rgba(255,255,255,.05);
 }
 h2 { font-size: 14px; margin: 0 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.services-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.services-head h2 { margin: 0; }
+.filter { padding: 6px 10px; background: var(--panel-2); color: var(--text); border: 1px solid transparent; border-radius: 6px; font-size: 12px; }
+.filter:focus { outline: none; border-color: var(--accent); }
 form { display: grid; grid-template-columns: 2fr 1fr 1fr auto auto; gap: 8px; align-items: center; }
 input[type=text], input[type=number], input:not([type]) {
   padding: 8px 10px;
