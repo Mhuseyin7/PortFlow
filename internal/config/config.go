@@ -8,19 +8,14 @@ import (
 	"path/filepath"
 )
 
-// DataDir returns the effective data directory (~/.portflow by default).
-// override, if non-empty, is used as-is.
-func DataDir(override string) (string, error) {
+// ResolveDataDir returns the effective data directory (~/.portflow by
+// default, PORTFLOW_HOME or override when set) without creating anything, so
+// read-only commands like `portflow doctor` have no side effects.
+func ResolveDataDir(override string) (string, error) {
 	if override != "" {
-		if err := os.MkdirAll(override, 0o700); err != nil {
-			return "", err
-		}
 		return override, nil
 	}
 	if env := os.Getenv("PORTFLOW_HOME"); env != "" {
-		if err := os.MkdirAll(env, 0o700); err != nil {
-			return "", err
-		}
 		return env, nil
 	}
 	home, err := os.UserHomeDir()
@@ -30,7 +25,15 @@ func DataDir(override string) (string, error) {
 	if home == "" {
 		return "", errors.New("could not resolve home directory")
 	}
-	dir := filepath.Join(home, ".portflow")
+	return filepath.Join(home, ".portflow"), nil
+}
+
+// DataDir resolves the data directory and creates it (mode 0700) if needed.
+func DataDir(override string) (string, error) {
+	dir, err := ResolveDataDir(override)
+	if err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
