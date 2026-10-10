@@ -10,17 +10,26 @@ package hosts
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/portflow/portflow/internal/hostname"
 )
 
+// Markers are ASCII-only on purpose: some tools read the hosts file in a
+// legacy code page.
 const (
-	BeginMarker = "# BEGIN PortFlow (managed) — do not edit inside this block"
+	BeginMarker = "# BEGIN PortFlow (managed) - do not edit inside this block"
 	EndMarker   = "# END PortFlow"
 )
+
+// ErrUnterminatedBlock means the begin marker exists without an end marker.
+// PortFlow refuses to guess which lines belong to it.
+var ErrUnterminatedBlock = errors.New("hosts file has a PortFlow begin marker without an end marker; fix it by hand")
 
 // Manager coordinates edits to the hosts file.
 type Manager struct {
@@ -43,53 +52,60 @@ func NewManagerAt(path string) *Manager {
 func (m *Manager) Path() string { return m.path }
 
 // Set replaces PortFlow's managed block with entries for the given hostnames,
-// all pointing at 127.0.0.1 and ::1.
+// all pointing at 127.0.0.1 and ::1. Invalid names are rejected, never written.
 func (m *Manager) Set(hostnames []string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	raw, err := os.ReadFile(m.path)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	prefix, suffix := splitAroundBlock(raw)
-	block := renderBlock(hostnames)
-	out := joinParts(prefix, block, suffix)
-	return atomicWriteHosts(m.path, out)
+	return m.set(hostnames)
 }
 
-// Add is a convenience that reads current entries and adds one.
-func (m *Manager) Add(hostname string) error {
-	current, err := m.Current()
+// Add adds one hostname to the managed block (idempotent).
+func (m *Manager) Add(host string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cur, err := m.current()
 	if err != nil {
 		return err
 	}
-	for _, h := range current {
-		if strings.EqualFold(h, hostname) {
-			return nil
-		}
-	}
-	return m.Set(append(current, hostname))
+	return m.set(append(cur, host))
 }
 
-// Remove is a convenience that reads current entries and drops one.
-func (m *Manager) Remove(hostname string) error {
-	current, err := m.Current()
+// Remove drops one hostname from the managed block.
+func (m *Manager) Remove(host string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cur, err := m.current()
 	if err != nil {
 		return err
 	}
-	out := make([]string, 0, len(current))
-	for _, h := range current {
-		if !strings.EqualFold(h, hostname) {
+	host = hostname.Normalize(host)
+	out := make([]string, 0, len(cur))
+	for _, h := range cur {
+		if h != host {
 			out = append(out, h)
 		}
 	}
-	return m.Set(out)
+	return m.set(out)
 }
 
 // Current returns the hostnames PortFlow currently manages.
 func (m *Manager) Current() ([]string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.current()
+}
+
+// Writable reports whether the hosts file can be opened for writing, without
+// modifying it. Used by `portflow doctor`.
+func (m *Manager) Writable() error {
+	f, err := os.OpenFile(m.path, os.O_WRONLY, 0)
+	if err != nil {
+		return err
+	}
+	return f.Close()
+}
+
+func (m *Manager) current() ([]string, error) {
 	raw, err := os.ReadFile(m.path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -97,9 +113,9 @@ func (m *Manager) Current() ([]string, error) {
 		}
 		return nil, err
 	}
-	_, block, _ := splitBlock(raw)
-	if block == nil {
-		return nil, nil
+	_, block, _, err := splitBlock(raw)
+	if err != nil || block == nil {
+		return nil, err
 	}
 	var out []string
 	seen := map[string]bool{}
@@ -110,9 +126,6 @@ func (m *Manager) Current() ([]string, error) {
 			continue
 		}
 		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			continue
-		}
 		for _, name := range fields[1:] {
 			if !seen[name] {
 				seen[name] = true
@@ -124,14 +137,52 @@ func (m *Manager) Current() ([]string, error) {
 	return out, nil
 }
 
-func renderBlock(hostnames []string) []byte {
-	if len(hostnames) == 0 {
+func (m *Manager) set(hostnames []string) error {
+	names, err := cleanNames(hostnames)
+	if err != nil {
+		return err
+	}
+	raw, err := os.ReadFile(m.path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	before, _, after, err := splitBlock(raw)
+	if err != nil {
+		return err
+	}
+	out := joinParts(before, renderBlock(names), after)
+	if bytes.Equal(out, raw) {
 		return nil
 	}
-	sort.Strings(hostnames)
+	return atomicWriteHosts(m.path, out)
+}
+
+// cleanNames normalizes, validates, de-duplicates and sorts without touching
+// the caller's slice.
+func cleanNames(in []string) ([]string, error) {
+	seen := make(map[string]bool, len(in))
+	out := make([]string, 0, len(in))
+	for _, h := range in {
+		h = hostname.Normalize(h)
+		if err := hostname.Validate(h); err != nil {
+			return nil, fmt.Errorf("refusing to write %q to the hosts file: %w", h, err)
+		}
+		if !seen[h] {
+			seen[h] = true
+			out = append(out, h)
+		}
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+func renderBlock(names []string) []byte {
+	if len(names) == 0 {
+		return nil
+	}
 	var buf bytes.Buffer
 	buf.WriteString(BeginMarker + "\n")
-	for _, h := range hostnames {
+	for _, h := range names {
 		fmt.Fprintf(&buf, "127.0.0.1\t%s\n", h)
 		fmt.Fprintf(&buf, "::1\t%s\n", h)
 	}
@@ -139,27 +190,36 @@ func renderBlock(hostnames []string) []byte {
 	return buf.Bytes()
 }
 
-// splitBlock returns (before, block, after) — block includes markers.
-func splitBlock(raw []byte) (before, block, after []byte) {
-	beginIdx := bytes.Index(raw, []byte(BeginMarker))
-	if beginIdx < 0 {
-		return raw, nil, nil
+// splitBlock returns (before, block, after); block includes both marker
+// lines. Markers only count when they are a whole line.
+func splitBlock(raw []byte) (before, block, after []byte, err error) {
+	begin, end := -1, -1
+	for off := 0; off < len(raw); {
+		next := len(raw)
+		lineEnd := len(raw)
+		if nl := bytes.IndexByte(raw[off:], '\n'); nl >= 0 {
+			lineEnd = off + nl
+			next = lineEnd + 1
+		}
+		line := strings.TrimRight(string(raw[off:lineEnd]), " \t\r")
+		switch {
+		case begin < 0 && line == BeginMarker:
+			begin = off
+		case begin >= 0 && line == EndMarker:
+			end = next
+		}
+		if end >= 0 {
+			break
+		}
+		off = next
 	}
-	endIdx := bytes.Index(raw[beginIdx:], []byte(EndMarker))
-	if endIdx < 0 {
-		return raw, nil, nil
+	if begin < 0 {
+		return raw, nil, nil, nil
 	}
-	endIdx += beginIdx + len(EndMarker)
-	if endIdx < len(raw) && raw[endIdx] == '\n' {
-		endIdx++
+	if end < 0 {
+		return nil, nil, nil, ErrUnterminatedBlock
 	}
-	return raw[:beginIdx], raw[beginIdx:endIdx], raw[endIdx:]
-}
-
-// splitAroundBlock returns (before, after) with any existing block removed.
-func splitAroundBlock(raw []byte) (before, after []byte) {
-	b, _, a := splitBlock(raw)
-	return b, a
+	return raw[:begin], raw[begin:end], raw[end:], nil
 }
 
 func joinParts(prefix, block, suffix []byte) []byte {
@@ -170,11 +230,7 @@ func joinParts(prefix, block, suffix []byte) []byte {
 			buf.WriteByte('\n')
 		}
 	}
-	if len(block) > 0 {
-		buf.Write(block)
-	}
-	if len(suffix) > 0 {
-		buf.Write(suffix)
-	}
+	buf.Write(block)
+	buf.Write(suffix)
 	return buf.Bytes()
 }
