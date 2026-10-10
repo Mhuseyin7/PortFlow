@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/portflow/portflow/internal/api"
+	"github.com/portflow/portflow/internal/netutil"
 	"github.com/portflow/portflow/internal/registry"
 )
 
@@ -110,15 +111,7 @@ func ensureDaemon(c *client) error {
 // It only connects; it never binds the port, so it cannot disturb a dev
 // server that is just starting.
 func portListening(host string, port int) bool {
-	if host == "" {
-		host = "127.0.0.1"
-	}
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort(strings.Trim(host, "[]"), strconv.Itoa(port)), 300*time.Millisecond)
-	if err != nil {
-		return false
-	}
-	_ = conn.Close()
-	return true
+	return netutil.CanConnect(strings.Trim(host, "[]"), strconv.Itoa(port), 300*time.Millisecond)
 }
 
 // urls builds browser addresses for services, adding the proxy's port when it

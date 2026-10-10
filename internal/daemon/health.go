@@ -2,12 +2,12 @@ package daemon
 
 import (
 	"context"
-	"net"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/portflow/portflow/internal/hostname"
+	"github.com/portflow/portflow/internal/netutil"
 	"github.com/portflow/portflow/internal/registry"
 )
 
@@ -52,11 +52,8 @@ func probe(s registry.Service, allowExternal bool) string {
 	if !allowExternal && !hostname.IsLoopbackHost(host) {
 		return registry.StatusMisconfigured
 	}
-	target := net.JoinHostPort(strings.Trim(host, "[]"), strconv.Itoa(s.TargetPort))
-	c, err := net.DialTimeout("tcp", target, 500*time.Millisecond)
-	if err != nil {
+	if !netutil.CanConnect(strings.Trim(host, "[]"), strconv.Itoa(s.TargetPort), 500*time.Millisecond) {
 		return registry.StatusDown
 	}
-	_ = c.Close()
 	return registry.StatusUp
 }
