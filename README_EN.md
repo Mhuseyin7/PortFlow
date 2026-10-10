@@ -33,7 +33,9 @@ store without an explicit command.
 - SQLite service registry with hostname uniqueness and health tracking.
 - Managed-block hosts-file editor with atomic writes.
 - Process discovery (Next.js, Vite, FastAPI, Django, Express, …) and
-  optional Docker discovery.
+  optional Docker discovery (`portflow detect`), HTTP-only by default.
+- Hardened loopback-only management API (DNS-rebinding and CSRF protection).
+- Optional in-memory request log (`portflow logs`), off by default.
 - Embedded web dashboard + Tauri 2 desktop shell.
 - Clean cobra-based CLI.
 
