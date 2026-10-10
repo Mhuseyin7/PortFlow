@@ -21,4 +21,4 @@ clean:
 
 # Local dev daemon on high ports so no elevation is needed.
 dev: build
-	./portflow daemon start --http 127.0.0.1:8080 --https 127.0.0.1:8443
+	./portflow daemon start --http 127.0.0.1:8080,[::1]:8080 --https 127.0.0.1:8443,[::1]:8443
