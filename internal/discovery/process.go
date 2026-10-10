@@ -15,6 +15,9 @@ type Hit struct {
 	Process string `json:"process"`
 	PID     int32  `json:"pid"`
 	Guess   string `json:"guess"` // a slug like "app", "api", "docs"
+	// Exposed is true when the listener is bound to all interfaces instead of
+	// loopback only, so other machines on the network can reach it directly.
+	Exposed bool `json:"exposed"`
 }
 
 // ScanLocal returns every unique loopback listener we find.
@@ -23,18 +26,23 @@ func ScanLocal() ([]Hit, error) {
 	if err != nil {
 		return nil, err
 	}
-	seen := map[int]bool{}
+	seen := map[int]int{} // port -> index in out
 	var out []Hit
 	for _, c := range conns {
-		if c.Status != "LISTEN" || c.Laddr.Port == 0 || seen[int(c.Laddr.Port)] {
+		if c.Status != "LISTEN" || c.Laddr.Port == 0 {
 			continue
 		}
 		ip := c.Laddr.IP
-		if ip != "127.0.0.1" && ip != "::1" && ip != "0.0.0.0" && ip != "::" {
+		wildcard := ip == "0.0.0.0" || ip == "::"
+		if ip != "127.0.0.1" && ip != "::1" && !wildcard {
 			continue
 		}
-		seen[int(c.Laddr.Port)] = true
-		h := Hit{Port: int(c.Laddr.Port), PID: c.Pid}
+		if i, dup := seen[int(c.Laddr.Port)]; dup {
+			out[i].Exposed = out[i].Exposed || wildcard
+			continue
+		}
+		seen[int(c.Laddr.Port)] = len(out)
+		h := Hit{Port: int(c.Laddr.Port), PID: c.Pid, Exposed: wildcard}
 		if c.Pid > 0 {
 			if p, err := process.NewProcess(c.Pid); err == nil {
 				if name, err := p.Name(); err == nil {

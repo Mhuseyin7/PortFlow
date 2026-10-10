@@ -27,6 +27,7 @@ type DockerHit struct {
 	Port       int    `json:"port"`
 	TargetPort int    `json:"target_port"`
 	Proto      string `json:"proto"`
+	Exposed    bool   `json:"exposed"` // published on all interfaces, not just loopback
 }
 
 // ScanDocker lists containers with published loopback ports.
@@ -91,6 +92,7 @@ func ScanDocker(ctx context.Context) ([]DockerHit, error) {
 				Port:       p.PublicPort,
 				TargetPort: p.PrivatePort,
 				Proto:      p.Type,
+				Exposed:    !isLoopback(p.IP),
 			})
 		}
 	}
