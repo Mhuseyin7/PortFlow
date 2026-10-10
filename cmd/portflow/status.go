@@ -7,15 +7,17 @@ import (
 )
 
 type statusReport struct {
-	Version    string `json:"version"`
-	Commit     string `json:"commit"`
-	Uptime     string `json:"uptime"`
-	Services   int    `json:"services"`
-	ProxyHTTP  string `json:"proxy_http"`
-	ProxyHTTPS string `json:"proxy_https"`
-	APIAddr    string `json:"api_addr"`
-	CAReady    bool   `json:"ca_ready"`
-	CATrusted  bool   `json:"ca_trusted"`
+	Version              string `json:"version"`
+	Commit               string `json:"commit"`
+	Uptime               string `json:"uptime"`
+	Services             int    `json:"services"`
+	ProxyHTTP            string `json:"proxy_http"`
+	ProxyHTTPS           string `json:"proxy_https"`
+	APIAddr              string `json:"api_addr"`
+	CAReady              bool   `json:"ca_ready"`
+	CATrusted            bool   `json:"ca_trusted"`
+	RequestLog           bool   `json:"request_log"`
+	AllowExternalTargets bool   `json:"allow_external_targets"`
 }
 
 func newStatusCmd() *cobra.Command {
@@ -38,10 +40,21 @@ func newStatusCmd() *cobra.Command {
 			fmt.Printf("api:        %s\n", s.APIAddr)
 			fmt.Printf("services:   %d registered\n", s.Services)
 			fmt.Printf("local CA:   ready=%v trusted=%v\n", s.CAReady, s.CATrusted)
+			fmt.Printf("req log:    %s\n", onOff(s.RequestLog))
+			if s.AllowExternalTargets {
+				fmt.Println("warning:    external (non-loopback) proxy targets are ENABLED")
+			}
 			if s.CAReady && !s.CATrusted {
 				fmt.Println("\n  run `portflow trust` to install the local CA in your OS trust store")
 			}
 			return nil
 		},
 	}
+}
+
+func onOff(b bool) string {
+	if b {
+		return "on"
+	}
+	return "off"
 }

@@ -2,10 +2,10 @@ package portflow
 
 import (
 	"fmt"
-	"net"
 	"strconv"
 	"time"
 
+	"github.com/portflow/portflow/internal/hostname"
 	"github.com/spf13/cobra"
 )
 
@@ -20,15 +20,11 @@ func newInfoCmd() *cobra.Command {
 				return err
 			}
 			var svc Service
-			if err := c.get("/api/services/"+args[0], &svc); err != nil {
+			if err := c.get("/api/services/"+pathEscape(hostname.Normalize(args[0])), &svc); err != nil {
 				return err
 			}
-			scheme := "http"
-			if svc.TLS {
-				scheme = "https"
-			}
 			fmt.Printf("hostname:    %s\n", svc.Hostname)
-			fmt.Printf("url:         %s://%s\n", scheme, svc.Hostname)
+			fmt.Printf("url:         %s\n", c.urls().of(svc))
 			fmt.Printf("target:      %s:%d\n", svc.TargetHost, svc.TargetPort)
 			fmt.Printf("project:     %s\n", nonEmptyOr(svc.Project, "(none)"))
 			fmt.Printf("protocol:    %s\n", svc.Protocol)
@@ -36,15 +32,11 @@ func newInfoCmd() *cobra.Command {
 			fmt.Printf("status:      %s\n", svc.Status)
 			fmt.Printf("created:     %s\n", svc.CreatedAt.Local().Format(time.RFC3339))
 			fmt.Printf("updated:     %s\n", svc.UpdatedAt.Local().Format(time.RFC3339))
-
-			target := net.JoinHostPort(svc.TargetHost, strconv.Itoa(svc.TargetPort))
-			fmt.Printf("live probe:  dialing %s ... ", target)
-			conn, err := net.DialTimeout("tcp", target, 500*time.Millisecond)
-			if err != nil {
-				fmt.Printf("DOWN (%v)\n", err)
-			} else {
-				_ = conn.Close()
+			fmt.Printf("live probe:  %s:%s ... ", svc.TargetHost, strconv.Itoa(svc.TargetPort))
+			if portListening(svc.TargetHost, svc.TargetPort) {
 				fmt.Println("UP")
+			} else {
+				fmt.Println("DOWN (nothing is listening on that port)")
 			}
 			return nil
 		},

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/portflow/portflow/internal/config"
+	"github.com/portflow/portflow/internal/hostname"
 	"github.com/spf13/cobra"
 )
 
@@ -22,17 +23,21 @@ func newProjectCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			base := filepath.Base(wd)
+			// A directory name like "Active Projects" is not a valid DNS label.
+			name := hostname.Slug(filepath.Base(wd))
+			if name == "" {
+				name = "project"
+			}
 			path := filepath.Join(wd, "portflow.yml")
 			if _, err := os.Stat(path); err == nil {
 				return fmt.Errorf("%s already exists", path)
 			}
 			p := &config.Project{
 				Version: 1,
-				Project: base,
+				Project: name,
 				Services: map[string]config.ProjectService{
-					"app": {Domain: "app." + base + ".test", Port: 3000},
-					"api": {Domain: "api." + base + ".test", Port: 8000},
+					"app": {Domain: "app." + name + ".test", Port: 3000},
+					"api": {Domain: "api." + name + ".test", Port: 8000},
 				},
 			}
 			if err := config.WriteProject(path, p); err != nil {

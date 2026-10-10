@@ -3,6 +3,7 @@ package portflow
 import (
 	"fmt"
 
+	"github.com/portflow/portflow/internal/hostname"
 	"github.com/spf13/cobra"
 )
 
@@ -17,10 +18,11 @@ func newRemoveCmd() *cobra.Command {
 			if err := ensureDaemon(c); err != nil {
 				return err
 			}
-			if err := c.del("/api/services/"+args[0], nil); err != nil {
+			host := hostname.Normalize(args[0])
+			if err := c.del("/api/services/"+pathEscape(host), nil); err != nil {
 				return err
 			}
-			fmt.Printf("Removed %s\n", args[0])
+			fmt.Printf("Removed %s\n", host)
 			return nil
 		},
 	}

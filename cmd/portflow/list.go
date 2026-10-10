@@ -2,7 +2,7 @@ package portflow
 
 import (
 	"fmt"
-	"sort"
+	"strconv"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -26,17 +26,12 @@ func newListCmd() *cobra.Command {
 				fmt.Println("no services registered — try `portflow add app.shop.test 3000`")
 				return nil
 			}
-			sort.SliceStable(svcs, func(i, j int) bool {
-				if svcs[i].Project != svcs[j].Project {
-					return svcs[i].Project < svcs[j].Project
-				}
-				return svcs[i].Hostname < svcs[j].Hostname
-			})
+			u := c.urls()
 			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-			var project string
+			project := "\x00" // the daemon returns services ordered by project
 			for _, s := range svcs {
 				if s.Project != project {
-					if project != "" {
+					if project != "\x00" {
 						fmt.Fprintln(w)
 					}
 					project = s.Project
@@ -46,11 +41,7 @@ func newListCmd() *cobra.Command {
 					}
 					fmt.Fprintf(w, "%s\n", name)
 				}
-				scheme := "http"
-				if s.TLS {
-					scheme = "https"
-				}
-				fmt.Fprintf(w, "  %s\t:%d\t%s\n", s.Hostname+"  ("+scheme+")", s.TargetPort, s.Status)
+				fmt.Fprintf(w, "  %s\t:%s\t%s\n", u.of(s), strconv.Itoa(s.TargetPort), s.Status)
 			}
 			return w.Flush()
 		},
