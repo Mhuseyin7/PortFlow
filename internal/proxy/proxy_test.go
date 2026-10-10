@@ -136,6 +136,27 @@ func TestProxiesAndSetsForwardingHeaders(t *testing.T) {
 	}
 }
 
+func TestIPv4TargetReachesServerBoundOnlyToIPv6(t *testing.T) {
+	ln, err := net.Listen("tcp", "[::1]:0")
+	if err != nil {
+		t.Skipf("IPv6 loopback unavailable: %v", err)
+	}
+	up := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "hello from ipv6")
+	}))
+	up.Listener.Close()
+	up.Listener = ln
+	up.Start()
+	t.Cleanup(up.Close)
+
+	// The registered target is the default 127.0.0.1, as for a Node 17+ dev server.
+	h := New(Options{Resolver: svcFor("v6.shop.test", portOf(t, up.URL))}).Handler()
+	rw := do(h, "http://v6.shop.test/", nil)
+	if rw.Code != 200 || !strings.Contains(rw.Body.String(), "hello from ipv6") {
+		t.Fatalf("status=%d body=%s", rw.Code, rw.Body.String())
+	}
+}
+
 func TestPreserveHostForwardsOriginalHost(t *testing.T) {
 	up, got := recordingUpstream(t)
 	h := New(Options{Resolver: svcFor("api.shop.test", portOf(t, up.URL)), PreserveHost: true}).Handler()

@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/portflow/portflow/internal/hostname"
+	"github.com/portflow/portflow/internal/netutil"
 	"github.com/portflow/portflow/internal/registry"
 	"github.com/portflow/portflow/internal/reqlog"
 	pfca "github.com/portflow/portflow/internal/tls"
@@ -113,9 +114,14 @@ func (s *Server) Handler() http.Handler { return http.HandlerFunc(s.serve) }
 // HTTP(S)_PROXY from the environment: dev traffic must go straight to the
 // local target.
 func newTransport() *http.Transport {
+	d := &net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}
 	return &http.Transport{
-		Proxy:               nil,
-		DialContext:         (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		Proxy: nil,
+		// A 127.0.0.1 target also reaches servers bound only to ::1 (Node 17+
+		// resolves localhost to ::1), and the other way round.
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return netutil.DialLocal(ctx, d, network, addr)
+		},
 		MaxIdleConns:        100,
 		MaxIdleConnsPerHost: 16,
 		IdleConnTimeout:     90 * time.Second,

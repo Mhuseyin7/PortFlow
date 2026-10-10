@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/portflow/portflow/internal/netutil"
 )
 
 type closeWriter interface {
@@ -27,7 +29,7 @@ func (s *Server) proxyWebSocket(w http.ResponseWriter, r *http.Request, target *
 			"Connect with HTTP/1.1.")
 		return
 	}
-	upstream, err := net.DialTimeout("tcp", target.Host, 5*time.Second)
+	upstream, err := netutil.DialLocal(r.Context(), &net.Dialer{Timeout: 5 * time.Second}, "tcp", target.Host)
 	if err != nil {
 		writeDiag(w, http.StatusBadGateway, "upstream unreachable", host,
 			fmt.Sprintf("Could not reach %s: %v", target.Host, err),
