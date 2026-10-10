@@ -3,38 +3,38 @@
 package trust
 
 import (
-	"fmt"
 	"os/exec"
+	"strings"
 )
 
-// Install adds the CA to the macOS System keychain as a trusted root.
-// macOS will prompt for admin credentials via the security tool.
+const systemKeychain = "/Library/Keychains/System.keychain"
+
+// Install adds the CA to the System keychain as a trusted root. macOS asks
+// for administrator credentials.
 func Install(certPath string) error {
-	cmd := exec.Command("sudo", "security", "add-trusted-cert", "-d", "-r", "trustRoot",
-		"-k", "/Library/Keychains/System.keychain", certPath)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("security add-trusted-cert: %w: %s", err, string(out))
-	}
-	return nil
+	return run("sudo", "security", "add-trusted-cert", "-d", "-r", "trustRoot", "-k", systemKeychain, certPath)
 }
 
-// Uninstall removes the CA from the System keychain.
+// Uninstall removes the trust setting and then the certificate itself,
+// selected by SHA-1 so no other certificate is touched.
 func Uninstall(certPath string) error {
-	cmd := exec.Command("sudo", "security", "remove-trusted-cert", "-d", certPath)
-	out, err := cmd.CombinedOutput()
+	fp, err := fingerprint(certPath)
 	if err != nil {
-		return fmt.Errorf("security remove-trusted-cert: %w: %s", err, string(out))
+		return err
 	}
-	return nil
+	_ = run("sudo", "security", "remove-trusted-cert", "-d", certPath) // may already be gone
+	return run("sudo", "security", "delete-certificate", "-Z", fp, systemKeychain)
 }
 
-// IsInstalled looks for the CA CN in the System keychain.
+// IsInstalled reports whether this exact certificate is in the System keychain.
 func IsInstalled(certPath string) (bool, error) {
-	cmd := exec.Command("security", "find-certificate", "-c", "PortFlow Local Development CA",
-		"/Library/Keychains/System.keychain")
-	if err := cmd.Run(); err != nil {
+	fp, err := fingerprint(certPath)
+	if err != nil {
+		return false, err
+	}
+	out, err := exec.Command("security", "find-certificate", "-a", "-Z", "-c", caCommonName, systemKeychain).Output()
+	if err != nil {
 		return false, nil
 	}
-	return true, nil
+	return strings.Contains(strings.ToUpper(string(out)), fp), nil
 }
