@@ -11,24 +11,36 @@
     <h1>PortFlow</h1>
     <div id="status" class="status">…</div>
   </header>
+  <div id="banner" class="banner" role="status" hidden></div>
   <main>
     <section class="add">
-      <h2>Register a service</h2>
-      <form id="add-form">
+      <h2 id="form-title">Register a service</h2>
+      <form id="add-form" autocomplete="off">
         <input name="hostname" placeholder="app.shop.test" required>
         <input name="port" type="number" min="1" max="65535" placeholder="3000" required>
         <input name="project" placeholder="project (optional)">
-        <label><input type="checkbox" name="tls" checked> HTTPS</label>
-        <button type="submit">Add</button>
+        <label class="check"><input type="checkbox" name="tls" checked> HTTPS</label>
+        <button type="submit" id="submit-btn">Add</button>
+        <button type="button" id="cancel-edit" class="ghost" hidden>Cancel</button>
       </form>
-      <div id="add-err" class="err"></div>
+      <div id="add-err" class="err" role="alert"></div>
     </section>
     <section class="services">
       <div class="services-head">
         <h2>Services</h2>
-        <select id="filter" class="filter"></select>
+        <select id="filter" class="filter" aria-label="Filter by project"></select>
       </div>
       <div id="services"></div>
+    </section>
+    <section class="requests">
+      <div class="services-head">
+        <h2>Requests</h2>
+        <div class="log-controls">
+          <label class="check"><input type="checkbox" id="log-toggle"> record (in memory only)</label>
+          <button type="button" id="log-clear" class="ghost">clear</button>
+        </div>
+      </div>
+      <div id="requests" class="reqs"></div>
     </section>
   </main>
   <script src="/app.js"></script>
