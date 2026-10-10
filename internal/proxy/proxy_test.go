@@ -78,6 +78,23 @@ func TestExternalTargetsRejectedByDefault(t *testing.T) {
 	}
 }
 
+func TestDiagnosticPageEscapesHostHeader(t *testing.T) {
+	req := httptest.NewRequest("GET", "http://x/", nil)
+	req.Host = `<img src=x onerror=alert(1)>.test`
+	rw := httptest.NewRecorder()
+	serve(Options{Resolver: fakeResolver{}}, rw, req)
+	body := rw.Body.String()
+	if strings.Contains(body, "<img") {
+		t.Fatalf("Host header reached the diagnostic page unescaped:\n%s", body)
+	}
+	if !strings.Contains(body, "&lt;img") {
+		t.Fatalf("expected escaped host in page:\n%s", body)
+	}
+	if rw.Header().Get("Content-Security-Policy") == "" || rw.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatal("diagnostic page must carry CSP and nosniff headers")
+	}
+}
+
 // Sanity: dial an httptest upstream over a real listener within the test's
 // deadline. Not testing PortFlow directly — just guards the test env.
 func TestUpstreamReachableWithinDeadline(t *testing.T) {

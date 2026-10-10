@@ -17,6 +17,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net"
@@ -216,9 +217,18 @@ func isWebSocket(r *http.Request) bool {
 	return false
 }
 
+// writeDiag renders the diagnostic page. Every value is HTML-escaped: host
+// comes straight from the request's Host header and detail can contain
+// upstream error text, so none of it may reach the page as markup.
 func writeDiag(w http.ResponseWriter, code int, title, host, detail, hint string) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("X-PortFlow", "diagnostic")
+	title, host, detail, hint = html.EscapeString(title), html.EscapeString(host), html.EscapeString(detail), html.EscapeString(hint)
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("X-PortFlow", "diagnostic")
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
+	h.Set("Referrer-Policy", "no-referrer")
+	h.Set("Cache-Control", "no-store")
 	w.WriteHeader(code)
 	_, _ = io.WriteString(w, `<!doctype html>
 <html><head><meta charset="utf-8"><title>PortFlow — `+title+`</title>
