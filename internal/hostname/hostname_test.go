@@ -98,6 +98,19 @@ func TestSlug(t *testing.T) {
 	}
 }
 
+func TestValidateTarget(t *testing.T) {
+	for _, ok := range []string{"127.0.0.1", "::1", "[::1]", "localhost", "db", "host.docker.internal", "10.0.0.5"} {
+		if err := ValidateTarget(ok); err != nil {
+			t.Errorf("ValidateTarget(%q): %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"", " ", "a b", "evil.com/path", "host:80", "a..b", "-x", "x@y", "127.0.0.1 evil.com"} {
+		if err := ValidateTarget(bad); err == nil {
+			t.Errorf("ValidateTarget(%q) should fail", bad)
+		}
+	}
+}
+
 func TestValidateProject(t *testing.T) {
 	for _, ok := range []string{"", "shop", "my-app", "a1"} {
 		if err := ValidateProject(ok); err != nil {

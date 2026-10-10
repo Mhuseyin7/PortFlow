@@ -42,6 +42,28 @@ func Validate(h string) error {
 	return nil
 }
 
+// ValidateTarget checks a proxy target host: an IP literal (optionally in
+// brackets) or a DNS name of one or more valid labels such as "localhost" or
+// a Docker service name. It says nothing about whether the target is allowed.
+func ValidateTarget(h string) error {
+	h = strings.Trim(strings.TrimSpace(h), "[]")
+	if h == "" {
+		return errors.New("target host required")
+	}
+	if net.ParseIP(h) != nil {
+		return nil
+	}
+	if len(h) > 253 {
+		return errors.New("target host too long")
+	}
+	for _, l := range strings.Split(strings.ToLower(h), ".") {
+		if err := validLabel(l); err != nil {
+			return fmt.Errorf("invalid target host %q: %w", h, err)
+		}
+	}
+	return nil
+}
+
 // ValidateProject checks a project group name. The empty string is allowed
 // and means "no project".
 func ValidateProject(p string) error {
