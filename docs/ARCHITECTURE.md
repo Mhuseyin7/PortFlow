@@ -41,7 +41,10 @@ Browser  ->  |   Reverse proxy   |  ->   | Your dev server|
 | `internal/trust`               | Per-OS trust store install/uninstall (Windows/macOS/Linux). |
 | `internal/hosts`               | Managed-block editor for the OS hosts file. |
 | `internal/proxy`               | Hostname-routed reverse proxy: HTTP/1.1, HTTP/2, WebSocket, SSE. |
-| `internal/discovery`           | Process (gopsutil) and Docker discovery. |
+| `internal/discovery`           | Process (gopsutil) and Docker discovery, HTTP probe, and unique-name planning for `detect`. |
+| `internal/netutil`             | Loopback dialing with IPv4/IPv6 fallback, shared by the proxy, health loop and CLI. |
+| `internal/reqlog`              | Optional in-memory request log with query redaction (off by default). |
+| `internal/hostname`            | Hostname, suffix, project and target validation; slugging. |
 | `internal/api`                 | Loopback-only management HTTP API + JSON schemas. |
 | `internal/ui`                  | Embedded HTML/CSS/JS dashboard served by the daemon. |
 | `internal/daemon`              | Composes everything into one runnable process; health loop. |
@@ -54,8 +57,10 @@ Browser  ->  |   Reverse proxy   |  ->   | Your dev server|
    in the registry, and refuses if it's unknown (with an HTML diagnostic).
 3. For HTTPS, the cert store returns (or mints) a leaf cert signed by
    PortFlow's local CA.
-4. `httputil.ReverseProxy` forwards to `127.0.0.1:<port>` with the correct
-   `X-Forwarded-*` headers and a rewritten `Host`.
+4. One shared `httputil.ReverseProxy` forwards to the registered loopback
+   target (falling back to the other loopback family if needed). Client
+   `X-Forwarded-*` headers are replaced with observed values. `Host` is the
+   target address by default, or the original with `--preserve-host`.
 5. WebSocket upgrades are hijacked and tunneled bidirectionally.
 
 ## Storage layout
