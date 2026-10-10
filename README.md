@@ -103,20 +103,56 @@ artık **trusted**.
 ## CLI Reference
 
 ```
-portflow add <domain> <port>              yeni bir service register et
+portflow add <domain> <port> [--no-tls] [--target HOST] [-p PROJECT]
+                                          yeni bir service register et
 portflow remove <domain>                  service'i kaldır
 portflow list                             bütün service'leri listele (project bazlı)
 portflow info <domain>                    tek bir service için detay + canlı TCP probe
 portflow status                           daemon durumu
-portflow detect [--docker] [--register]   loopback dev server'ları (ve opsiyonel container'lar) tara
+portflow detect [--docker] [--all] [--register]
+                                          çalışan web server'ları (ve opsiyonel container'ları) bul
 portflow open <domain>                    domain'i browser'da aç
+portflow logs [--enable|--disable|--clear]
+                                          development request log'u (default kapalı)
 portflow project init                     starter portflow.yml oluştur
-portflow up [-f portflow.yml]             project file'daki her şeyi register et
-portflow trust                            local CA'yı OS trust store'a install et
-portflow untrust                          local CA'yı trust store'dan kaldır
-portflow doctor                           install ve environment tanısı (CA expiry warning dahil)
+portflow up [-f portflow.yml]             project file'daki her şeyi register et (tekrar çalıştırmak güvenli)
+portflow trust [-y]                       local CA'yı OS trust store'a install et (onay ister)
+portflow untrust [-y]                     local CA'yı trust store'dan kaldır
+portflow doctor                           salt-okunur install ve environment tanısı
 portflow daemon start|stop                daemon lifecycle
 ```
+
+Domain'ler yalnızca `.test`, `.localhost` veya `.local` ile bitebilir
+(gerçek bir siteyi gölgeleyemesin diye local development için ayrılmış
+uzantılar). `add`, `--no-tls` verilmedikçe HTTPS ile register eder.
+
+### `daemon start` bayrakları
+
+| Bayrak | Anlamı |
+| --- | --- |
+| `--http`, `--https` | Proxy dinleme adresleri, virgülle ayrılmış liste. Default: `127.0.0.1:80,[::1]:80` ve `127.0.0.1:443,[::1]:443`. IPv6 yoksa o adres atlanır. |
+| `--api` | Management API adresi. Her zaman tek ve loopback olmak zorundadır. |
+| `--lan` | Proxy'nin loopback dışı adreslerde dinlemesine izin verir. Dev servislerinizi ağınıza açar; default kapalı. |
+| `--allow-external-targets` | Loopback olmayan hedefleri register etmeye izin verir. Default kapalı. |
+| `--preserve-host` | Dev server'a kendi adresi yerine orijinal `Host` header'ını iletir. Default'ta hedef adres gönderilir; Vite, webpack-dev-server ve Next.js gibi `Host` doğrulayan server'lar böylece çalışır. |
+| `--request-log` | Bellekteki request log'u açık başlatır. |
+| `--skip-hosts` | Hosts dosyasını yönetmez (DNS'i siz çözersiniz). |
+
+### Request log
+
+`portflow logs --enable` ile (veya dashboard'dan) açılır. Yalnızca
+son 500 isteği, **bellekte** tutar: method, host, path, status, süre.
+Header, cookie ve body asla kaydedilmez; hassas görünen query değerleri
+`[redacted]` yazılır. Daemon kapanınca silinir.
+
+### `detect` nasıl çalışır
+
+Yalnızca HTTP'ye cevap veren listener'lar önerilir (veritabanları için
+`--all`). PortFlow'un kendi port'ları ve zaten kayıtlı hedefler listeye
+girmez. Aynı isim iki kez çıkarsa ikincisi `app-5173.dev.test` gibi
+benzersizleştirilir. Tüm arayüzlere bağlı servisler
+`[listens on all interfaces]` ile işaretlenir; ağdan PortFlow'u atlayarak
+erişilebilirler. `--register` vermedikçe hiçbir şey kaydedilmez.
 
 ---
 
@@ -156,19 +192,35 @@ Windows'ta Administrator ister.
 Elevation istemiyorsanız:
 
 ```bash
-./portflow daemon start --http 127.0.0.1:8080 --https 127.0.0.1:8443
+./portflow daemon start --http 127.0.0.1:8080,[::1]:8080 --https 127.0.0.1:8443,[::1]:8443
 ```
 
-Sonra `https://app.shop.test:8443` şeklinde kullanın.
+Sonra `https://app.shop.test:8443` şeklinde kullanın. `portflow open`,
+`list` ve `info` doğru portlu adresi kendileri yazar.
+
+Hedef `127.0.0.1` iken dev server yalnızca `::1`'e bağlıysa (Node 17+
+`localhost`'u `::1` olarak çözer), PortFlow diğer loopback ailesini de
+dener; tersi de geçerlidir.
 
 ---
 
 ## Security Model
 
-- Proxy ve management API sadece **loopback**'e bind olur. LAN mode
-  opt-in'dir.
-- Proxy target'ları default olarak sadece `127.0.0.1`'e izin verir —
-  hostile bir `Host` header ile SSRF yapılamaz.
+- Proxy ve management API sadece **loopback**'e bind olur. Proxy için LAN
+  mode `--lan` ile opt-in'dir; management API hiçbir zaman LAN'a açılmaz.
+- Management API üç kapıdan geçirir: bağlanan taraf loopback olmalı, `Host`
+  header'ı loopback adı olmalı (DNS rebinding), state değiştiren isteklerde
+  `X-PortFlow` header'ı ve aynı-origin `Origin` olmalı (CSRF). Kötü niyetli
+  bir web sayfası `127.0.0.1:9280`'e istek atıp servis kaydedemez ya da
+  daemon'u kapatamaz.
+- Proxy target'ları default olarak sadece loopback'e izin verir —
+  hostile bir `Host` header ile SSRF yapılamaz. Sağlık kontrolü de
+  loopback dışına bağlanmaz.
+- Domain'ler yalnızca `.test`, `.localhost`, `.local` olabilir; CA'nın
+  kendisi de yalnızca bu adlar için imza atabilecek şekilde kısıtlıdır
+  (name constraints). Anahtarı sızsa bile gerçek bir siteyi taklit edemez.
+- Diagnostic hata sayfaları HTML-escape edilir ve CSP/`nosniff` ile gelir;
+  dashboard DOM'u `textContent` ile kurar.
 - Local CA private key `~/.portflow/ca/` altında **mode 0600** ile durur.
 - Leaf certificate'ler yalnızca **registry'de kayıtlı** hostname'ler için
   imzalanır. Arbitrary SNI ile cert alınamaz.
